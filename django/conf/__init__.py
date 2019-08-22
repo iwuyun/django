@@ -198,4 +198,29 @@ class UserSettingsHolder(object):
         }
 
 
-settings = LazySettings()
+class ComprehensiveSettings(object):
+    def __init__(self):
+        self._settings_map = {}
+        self._active_site_name = None
+
+    def add_settings(self, site_name, settings):
+        self._settings_map[site_name] = settings
+        self.switch_settings(site_name)
+
+    def switch_settings(self, switch_to):
+        self._active_site_name = switch_to
+
+    def __getattr__(self, attr_name):
+        if self._active_site_name is None:
+            active_site_settings = LazySettings()
+            active_site_settings._setup()
+        else:
+            active_site_settings = self._settings_map[self._active_site_name]
+        if attr_name == 'configured':
+            return active_site_settings.configured
+        if attr_name in active_site_settings.__dict__:
+            return active_site_settings.__dict__[attr_name]
+        return active_site_settings.__getattr__(attr_name)
+
+
+settings = ComprehensiveSettings()

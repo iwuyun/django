@@ -57,7 +57,7 @@ def _load_all_namespaces(resolver, parents=()):
     """
     Recursively load all namespaces from URL patterns.
     """
-    url_patterns = getattr(resolver, 'url_patterns', [])
+    url_patterns = getattr(resolver, 'url_patterns', lambda : [])()
     namespaces = [
         ':'.join(parents + (url.namespace,)) for url in url_patterns
         if getattr(url, 'namespace', None) is not None

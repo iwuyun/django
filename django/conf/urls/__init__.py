@@ -1,3 +1,4 @@
+import sys
 import warnings
 from importlib import import_module
 
@@ -47,6 +48,10 @@ def include(arg, namespace=None, app_name=None):
         urlconf_module = arg
 
     if isinstance(urlconf_module, six.string_types):
+        try:
+            del sys.modules[urlconf_module]
+        except KeyError:
+            pass
         urlconf_module = import_module(urlconf_module)
     patterns = getattr(urlconf_module, 'urlpatterns', urlconf_module)
     app_name = getattr(urlconf_module, 'app_name', app_name)

@@ -1,4 +1,6 @@
+import os
 import django
+from django.conf import LazySettings, settings
 from django.core.handlers.wsgi import WSGIHandler
 
 
@@ -12,3 +14,21 @@ def get_wsgi_application():
     """
     django.setup(set_prefix=False)
     return WSGIHandler()
+
+
+class MultiSiteApplication():
+    def __init__(self, module_map):
+        for site, settings_module in module_map.iteritems():
+            os.environ["DJANGO_SETTINGS_MODULE"] = settings_module
+            site_settings = LazySettings()
+            site_settings._setup()
+            settings.add_settings(site, site_settings)
+        self._application = get_wsgi_application()
+
+    def get_request_site(self, environ):
+        return environ['SERVER_NAME']
+
+    def __call__(self, environ, start_response):
+        site = self.get_request_site(environ)
+        settings.switch_settings(site)
+        return self._application(environ, start_response)

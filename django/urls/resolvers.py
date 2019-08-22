@@ -8,6 +8,7 @@ attributes of the resolved URL match.
 from __future__ import unicode_literals
 
 import functools
+import sys
 import re
 import threading
 from importlib import import_module
@@ -64,7 +65,7 @@ class ResolverMatch(object):
         )
 
 
-@lru_cache.lru_cache(maxsize=None)
+# @lru_cache.lru_cache(maxsize=None)
 def get_resolver(urlconf=None):
     if urlconf is None:
         from django.conf import settings
@@ -77,7 +78,7 @@ def get_ns_resolver(ns_pattern, resolver):
     # Build a namespaced resolver for the given parent URLconf pattern.
     # This makes it possible to have captured parameters in the parent
     # URLconf pattern.
-    ns_resolver = RegexURLResolver(ns_pattern, resolver.url_patterns)
+    ns_resolver = RegexURLResolver(ns_pattern, resolver.url_patterns())
     return RegexURLResolver(r'^/', [ns_resolver])
 
 
@@ -253,7 +254,7 @@ class RegexURLResolver(LocaleRegexProvider):
 
     def check(self):
         warnings = self._check_include_trailing_dollar()
-        for pattern in self.url_patterns:
+        for pattern in self.url_patterns():
             warnings.extend(check_resolver(pattern))
         if not warnings:
             warnings = self._check_pattern_startswith_slash()
@@ -287,7 +288,7 @@ class RegexURLResolver(LocaleRegexProvider):
         namespaces = {}
         apps = {}
         language_code = get_language()
-        for pattern in reversed(self.url_patterns):
+        for pattern in reversed(self.url_patterns()):
             if isinstance(pattern, RegexURLPattern):
                 self._callback_strs.add(pattern.lookup_str)
             p_pattern = pattern.regex.pattern
@@ -361,7 +362,7 @@ class RegexURLResolver(LocaleRegexProvider):
         match = self.regex.search(path)
         if match:
             new_path = path[match.end():]
-            for pattern in self.url_patterns:
+            for pattern in self.url_patterns():
                 try:
                     sub_match = pattern.resolve(new_path)
                 except Resolver404 as e:
@@ -394,17 +395,21 @@ class RegexURLResolver(LocaleRegexProvider):
             raise Resolver404({'tried': tried, 'path': new_path})
         raise Resolver404({'path': path})
 
-    @cached_property
+    # @cached_property
     def urlconf_module(self):
         if isinstance(self.urlconf_name, six.string_types):
+            try:
+                del sys.modules[self.urlconf_name]
+            except KeyError:
+                pass
             return import_module(self.urlconf_name)
         else:
             return self.urlconf_name
 
-    @cached_property
+    # @cached_property
     def url_patterns(self):
         # urlconf_module might be a valid set of patterns, so we default to it
-        patterns = getattr(self.urlconf_module, "urlpatterns", self.urlconf_module)
+        patterns = getattr(self.urlconf_module(), "urlpatterns", self.urlconf_module())
         try:
             iter(patterns)
         except TypeError:
@@ -417,7 +422,7 @@ class RegexURLResolver(LocaleRegexProvider):
         return patterns
 
     def resolve_error_handler(self, view_type):
-        callback = getattr(self.urlconf_module, 'handler%s' % view_type, None)
+        callback = getattr(self.urlconf_module(), 'handler%s' % view_type, None)
         if not callback:
             # No handler specified in file; use lazy import, since
             # django.conf.urls imports this file.
